@@ -1,4 +1,11 @@
 import { useState } from 'react'
+import './App.css'
+import DecisionBadge from './components/DecisionBadge.jsx'
+import CitationReview from './components/CitationReview.jsx'
+import CheckCard from './components/CheckCard.jsx'
+import JudicialMemo from './components/JudicialMemo.jsx'
+import MetricsGrid from './components/MetricsGrid.jsx'
+import ErrorList from './components/ErrorList.jsx'
 
 function App() {
   const [report, setReport] = useState(null)
@@ -8,17 +15,9 @@ function App() {
   const runAnalysis = async () => {
     setLoading(true)
     setError(null)
-    setReport(null)
-
     try {
-      const response = await fetch('http://localhost:8002/analyze', {
-        method: 'POST',
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`)
-      }
-
+      const response = await fetch('http://localhost:8002/analyze', { method: 'POST' })
+      if (!response.ok) throw new Error(`Server responded with ${response.status}`)
       const data = await response.json()
       setReport(data.report)
     } catch (err) {
@@ -28,50 +27,62 @@ function App() {
     }
   }
 
+  const checks = report?.checks ?? []
+
   return (
-    <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>BS Detector</h1>
-      <p>Legal brief verification pipeline</p>
-
-      <button
-        onClick={runAnalysis}
-        disabled={loading}
-        style={{
-          padding: '10px 24px',
-          fontSize: '16px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {loading ? 'Analyzing...' : 'Run Analysis'}
-      </button>
-
-      {error && (
-        <div style={{ marginTop: '20px', color: 'red' }}>
-          <strong>Error:</strong> {error}
+    <div className="app">
+      <header className="header">
+        <div className="header-text">
+          <h1 className="app-title">BS Detector</h1>
+          {report?.case_name && <div className="case-name">{report.case_name}</div>}
+          {!report && <div className="case-name">Legal brief verification pipeline</div>}
         </div>
-      )}
+        <button className="run-btn" onClick={runAnalysis} disabled={loading}>
+          {loading ? 'Analyzing…' : 'Run analysis'}
+        </button>
+      </header>
 
-      {report && (
-        <div style={{ marginTop: '20px' }}>
-          <h2>Report</h2>
-          <pre style={{
-            background: '#f5f5f5',
-            padding: '20px',
-            borderRadius: '4px',
-            overflow: 'auto',
-            whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word',
-          }}>
-            {typeof report === 'string' ? report : JSON.stringify(report, null, 2)}
-          </pre>
-        </div>
-      )}
+      <main className="main">
+        {error && (
+          <div className="error-banner">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
 
-      {report === null && !loading && !error && (
-        <p style={{ marginTop: '20px', color: '#888' }}>
-          Click "Run Analysis" to analyze the case documents.
-        </p>
-      )}
+        {!report && !loading && !error && (
+          <div className="empty-state">Click "Run analysis" to verify the motion.</div>
+        )}
+
+        {loading && <div className="empty-state">Analyzing motion — this may take a moment…</div>}
+
+        {report && (
+          <>
+            <section className="section">
+              <div className="hero-card">
+                <DecisionBadge decision={report.overall_decision} size="lg" />
+                {report.summary && <p className="hero-summary">{report.summary}</p>}
+              </div>
+            </section>
+
+            <CitationReview review={report.citation_review} />
+
+            {checks.length > 0 && (
+              <section className="section">
+                <h2 className="section-title">Factual Checks ({checks.length})</h2>
+                <div className="checks-list">
+                  {checks.map((c) => (
+                    <CheckCard key={c.check_id} check={c} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <JudicialMemo memo={report.judicial_memo} />
+            <MetricsGrid metrics={report.metrics} />
+            <ErrorList errors={report.errors} />
+          </>
+        )}
+      </main>
     </div>
   )
 }
