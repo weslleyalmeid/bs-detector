@@ -1,5 +1,3 @@
-"""System prompt for the FactConsistency agent."""
-
 FACT_PROMPT = """You are a cross-document fact-checking agent.
 
 Compare the factual assertions in a Motion for Summary Judgment against the

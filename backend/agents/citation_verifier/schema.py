@@ -1,5 +1,3 @@
-"""Tool-call schema for the CitationVerifier agent."""
-
 from typing import Optional
 
 from pydantic import BaseModel, Field

@@ -1,5 +1,3 @@
-"""LangGraph pipeline as a class. Compiled once at import."""
-
 from operator import add
 from typing import Annotated, Optional, TypedDict
 
@@ -31,15 +29,12 @@ _DECISION_BY_TYPE: dict[str, Decision] = {
 class State(TypedDict, total=False):
     documents: list[CaseDocument]
     motion: Optional[CaseDocument]
-    # `errors` uses an additive reducer so any node (including parallel
-    # branches) can append without clobbering prior errors.
     errors: Annotated[list[str], add]
-    # Single-writer slots — no reducer needed.
-    citations: list[CitationCandidate]      # written by node_citations
-    findings: list[Finding]                  # written by node_consistency
-    scored_findings: list[Finding]           # written by node_score
-    judicial_memo: Optional[str]             # written by node_memo
-    report: Optional[VerificationReport]     # written by node_assemble
+    citations: list[CitationCandidate]
+    findings: list[Finding]
+    scored_findings: list[Finding]
+    judicial_memo: Optional[str]
+    report: Optional[VerificationReport]
 
 
 def _safe(name, fn):
@@ -120,10 +115,6 @@ def _build_citation_review(citations: list[CitationCandidate]) -> CitationReview
 #   START ─┬─→ citations ──┐
 #          │               ├─→ score → memo → assemble → END
 #          └─→ consistency ┘
-#
-# citations + consistency are independent (different inputs, no shared state),
-# so they fan out from START in parallel. score/memo/assemble are sequential
-# because each consumes the previous one's output.
 
 
 def node_citations(state: State) -> dict:
@@ -143,7 +134,6 @@ def node_consistency(state: State) -> dict:
 
 
 def node_score(state: State) -> dict:
-    """Apply deterministic confidence scoring to raw findings."""
     scored = score_findings(state.get("findings", []), state.get("documents", []))
     return {"scored_findings": scored}
 
@@ -217,13 +207,10 @@ class LegalVerificationAgents:
         g.add_node("memo", _safe("memo", node_memo))
         g.add_node("assemble", _safe("assemble", node_assemble))
 
-        # Fan-out: citations + consistency run concurrently.
         g.add_edge(START, "citations")
         g.add_edge(START, "consistency")
-        # Join: score waits for both before running.
         g.add_edge("citations", "score")
         g.add_edge("consistency", "score")
-        # Sequential tail.
         g.add_edge("score", "memo")
         g.add_edge("memo", "assemble")
         g.add_edge("assemble", END)

@@ -1,5 +1,3 @@
-"""Adapters + helpers for documents. Deterministic, no LLM."""
-
 import hashlib
 import re
 
@@ -22,7 +20,6 @@ def _classify(stem: str) -> tuple[str, str]:
 
 
 def to_case_documents(raw: dict[str, str]) -> list[CaseDocument]:
-    """Convert {stem: text} (the existing load_documents shape) to CaseDocument list."""
     docs = []
     for stem, text in raw.items():
         doc_id, dtype = _classify(stem)

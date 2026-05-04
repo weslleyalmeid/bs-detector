@@ -1,10 +1,3 @@
-"""JudicialMemo agent.
-
-Free-text summarizer: takes the ranked Findings and produces a short paragraph
-suitable for a judge. Uses plain chat completion (no tool call) since the
-output is prose, not structured data.
-"""
-
 from llm import call_llm
 from schemas import Finding
 

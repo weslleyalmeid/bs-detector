@@ -1,5 +1,3 @@
-"""System prompt for the CitationVerifier agent."""
-
 CITATION_PROMPT = """You are a legal citation verification agent.
 
 Read a Motion for Summary Judgment. For EACH legal citation it contains:

@@ -1,14 +1,3 @@
-"""Eval harness for the BS Detector.
-
-Runs the LangGraph pipeline once, scores it against a small synthetic golden
-fixture, prints a readable report, and persists results to JSON.
-
-Usage (from backend/):
-    .venv/bin/python evals/run_evals.py
-or:
-    make eval
-"""
-
 import json
 import sys
 from datetime import datetime, timezone
@@ -26,9 +15,6 @@ from utils import normalize, quote_grounded_in, to_case_documents  # noqa: E402
 GOLDEN_PATH = THIS / "golden_findings.json"
 BASELINE_PATH = THIS / "baseline_results.json"
 RUNS_DIR = THIS / "runs"
-
-
-# --------------------------- matching ---------------------------
 
 
 def _check_text(check: VerificationCheck) -> str:
@@ -92,14 +78,10 @@ def _match_citation(expected: dict, citation: CitationCandidate) -> bool:
     return _keyword_overlap(text, keywords)
 
 
-# --------------------------- scoring ---------------------------
-
-
 def score(report: VerificationReport, golden: dict) -> dict:
     expected_checks = golden["expected_checks"]
     docs = to_case_documents(load_documents())
 
-    # 1) Match expected -> generated.
     used_checks: set[str] = set()
     used_citations: set[str] = set()
     matched_total = 0
@@ -119,7 +101,7 @@ def score(report: VerificationReport, golden: dict) -> dict:
                     used_checks.add(c.check_id)
                     hit = True
                     break
-        else:  # citation / quote
+        else:
             for cit in report.citation_review.citations:
                 if cit.citation_id in used_citations:
                     continue
@@ -133,7 +115,6 @@ def score(report: VerificationReport, golden: dict) -> dict:
             if exp["expected_decision"] == "rejected":
                 matched_rejected += 1
 
-    # 2) Generated rejected pool — for precision + hallucination.
     generated_rejected = [c for c in report.checks if c.decision == "rejected"]
     correct_rejected = sum(1 for c in generated_rejected if c.check_id in used_checks)
 
@@ -146,13 +127,11 @@ def score(report: VerificationReport, golden: dict) -> dict:
         ):
             ungrounded_rejected += 1
 
-    # 3) Coverage / unable_to_determine across the full check pool.
     total_checks = len(report.checks)
     accepted_checks = sum(1 for c in report.checks if c.decision == "accepted")
     unable_checks = sum(1 for c in report.checks if c.decision == "unable_to_determine")
     determined_checks = accepted_checks + len(generated_rejected)
 
-    # 4) Schema validity.
     try:
         VerificationReport.model_validate(report.model_dump())
         schema_validity = 1.0
@@ -184,9 +163,6 @@ def score(report: VerificationReport, golden: dict) -> dict:
         },
         "overall_decision": report.overall_decision,
     }
-
-
-# --------------------------- persistence + printing ---------------------------
 
 
 def _print_report(metrics: dict) -> None:
