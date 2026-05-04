@@ -133,12 +133,19 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
+.hero-text { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; flex: 1; }
+.hero-headline {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
 .hero .hero-summary {
   margin: 0;
-  flex: 1;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 400;
-  color: var(--text);
+  color: var(--muted);
   line-height: 1.45;
 }
 
@@ -163,17 +170,31 @@ body {
    Visible only once the user scrolls past the full hero. */
 .verdict-pill {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.85rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+.verdict-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.verdict-pill-label {
   font-size: 0.78rem;
   color: var(--muted);
   font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.verdict-pill-label { letter-spacing: 0.04em; text-transform: uppercase; }
+.verdict-pill-meaning {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text);
+  line-height: 1.4;
+}
 
 .empty-state {
   text-align: center; padding: 4rem 1rem; color: var(--muted);

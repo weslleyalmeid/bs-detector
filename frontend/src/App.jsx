@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import DecisionBadge from './components/DecisionBadge.jsx'
+import DecisionBadge, { overallMeaning } from './components/DecisionBadge.jsx'
 import CitationReview from './components/CitationReview.jsx'
 import CheckCard from './components/CheckCard.jsx'
 import JudicialMemo from './components/JudicialMemo.jsx'
@@ -75,7 +75,10 @@ function App() {
             {/* Verdict at a glance — full width */}
             <section className="hero" ref={heroRef}>
               <DecisionBadge decision={report.overall_decision} size="lg" />
-              {report.summary && <p className="hero-summary">{report.summary}</p>}
+              <div className="hero-text">
+                <p className="hero-headline">{overallMeaning(report.overall_decision)}</p>
+                {report.summary && <p className="hero-summary">{report.summary}</p>}
+              </div>
             </section>
 
             {/* Two-column investigative layout:
@@ -100,8 +103,11 @@ function App() {
               <aside className="report-col report-col--summary">
                 {!heroVisible && (
                   <div className="verdict-pill">
-                    <span className="verdict-pill-label">Verdict</span>
-                    <DecisionBadge decision={report.overall_decision} size="sm" />
+                    <div className="verdict-pill-row">
+                      <span className="verdict-pill-label">Verdict</span>
+                      <DecisionBadge decision={report.overall_decision} size="sm" />
+                    </div>
+                    <p className="verdict-pill-meaning">{overallMeaning(report.overall_decision)}</p>
                   </div>
                 )}
                 <JudicialMemo memo={report.judicial_memo} />
