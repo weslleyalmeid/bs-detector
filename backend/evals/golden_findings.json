@@ -1,0 +1,36 @@
+{
+  "case_name": "Rivera v. Harmon Construction Group, Inc.",
+  "notes": "Time-boxed golden set. Each expected check describes a known issue. Matching: same category + decision AND any keyword in the check's statement or reason.",
+  "expected_checks": [
+    {
+      "id": "incident_date",
+      "category": "fact",
+      "decision": "rejected",
+      "keywords": ["march 14", "march 12", "date of incident", "date of the incident"]
+    },
+    {
+      "id": "ppe_worn",
+      "category": "fact",
+      "decision": "rejected",
+      "keywords": ["personal protective equipment", "ppe", "harness", "fall-arrest", "fall arrest"]
+    },
+    {
+      "id": "control_of_work",
+      "category": "fact",
+      "decision": "rejected",
+      "keywords": ["donner", "directed", "control", "foreman"]
+    },
+    {
+      "id": "osha_inspection",
+      "category": "fact",
+      "decision": "unable_to_determine",
+      "keywords": ["osha", "inspection", "february 26"]
+    },
+    {
+      "id": "privette_quote",
+      "category": "citation",
+      "decision": "unable_to_determine",
+      "keywords": ["privette", "never liable", "hirer"]
+    }
+  ]
+}
