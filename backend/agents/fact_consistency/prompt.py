@@ -11,6 +11,8 @@ For each material factual claim in the motion, return ONE finding:
    motion. MUST include source_document AND evidence_quote (verbatim
    sentence from that document). The evidence_quote MUST contain the
    contradicting fact (e.g. the conflicting date, name, or number).
+   An evidence_quote about a different topic does NOT contradict the
+   claim — use "could_not_verify" instead.
 - "claim_supported": a supporting document directly confirms the motion's
    claim. MUST include source_document AND evidence_quote (verbatim
    sentence from that document). The evidence_quote MUST contain the

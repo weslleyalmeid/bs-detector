@@ -7,9 +7,11 @@ Three deterministic safeguards run after the LLM:
 
 1. Missing source/quote downgrade: a "claim_supported" or "fact_contradiction"
    without source_document AND evidence_quote is demoted to "could_not_verify".
-2. Semantic grounding for "claim_supported": the evidence_quote must share a
-   salient token (date, number, proper noun, key term) with the statement.
-   Otherwise it is demoted to "could_not_verify".
+2. Semantic grounding: a "claim_supported" or "fact_contradiction" whose
+   evidence_quote shares no salient token (date, number, proper noun) with
+   the statement is demoted to "could_not_verify". This blocks both false
+   acceptances ("14 feet" used to support a "March 14" claim) and false
+   rejections ("Cal/OSHA was notified" used to reject an IIPP claim).
 3. Dedupe by salient-token signature: when the LLM emits multiple findings
    about the same underlying fact (e.g. the incident date) we keep the
    strongest decision (rejected > accepted > could_not_verify).
@@ -86,11 +88,12 @@ def _to_finding(item: FactItem) -> Finding:
             " a verbatim source quote.)"
         ).strip()
 
-    # 2) Semantic grounding for claim_supported only.
-    # Contradictions are kept even on weak overlap because the LLM's
-    # judgement that a quote refutes a claim is itself signal; the eval
-    # already enforces verbatim grounding for rejected.
-    if finding_type == "claim_supported":
+    # 2) Semantic grounding: both decisions need the evidence_quote to share
+    # a salient token (date, number, proper noun) with the statement.
+    # Without overlap the LLM is usually citing an unrelated quote and the
+    # finding should be demoted instead of becoming a false rejection or
+    # a false acceptance.
+    if finding_type in _GROUNDED_TYPES:
         stmt_tokens = _salient_tokens(item.statement)
         quote_tokens = _salient_tokens(quote or "")
         if stmt_tokens and not (stmt_tokens & quote_tokens):
