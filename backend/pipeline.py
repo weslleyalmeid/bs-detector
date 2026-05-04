@@ -17,13 +17,14 @@ from schemas import (
 )
 
 CASE_NAME = "Rivera v. Harmon Construction Group, Inc."
-GROUNDING_REQUIRED = {"fact_contradiction", "inaccurate_quote"}
+GROUNDING_REQUIRED = {"fact_contradiction", "inaccurate_quote", "claim_supported"}
 
 _DECISION_BY_TYPE: dict[str, Decision] = {
     "could_not_verify": "unable_to_determine",
     "fact_contradiction": "rejected",
     "inaccurate_quote": "rejected",
     "unsupported_citation": "rejected",
+    "claim_supported": "accepted",
 }
 
 
@@ -162,11 +163,12 @@ def node_report(state: State) -> dict:
     memo = write_memo(findings)
 
     rejected = sum(1 for c in checks if c.decision == "rejected")
+    accepted = sum(1 for c in checks if c.decision == "accepted")
     unable = sum(1 for c in checks if c.decision == "unable_to_determine")
     summary = (
         f"Overall: {overall}. {len(checks)} factual check(s) — {rejected} rejected,"
-        f" {unable} unable to determine. {len(citations)} citation(s) reviewed"
-        f" ({citation_review.decision})."
+        f" {accepted} accepted, {unable} unable to determine. {len(citations)} citation(s)"
+        f" reviewed ({citation_review.decision})."
     )
 
     return {
@@ -182,7 +184,7 @@ def node_report(state: State) -> dict:
                 "total_checks": len(checks),
                 "rejected_count": rejected,
                 "unable_to_determine_count": unable,
-                "accepted_count": sum(1 for c in checks if c.decision == "accepted"),
+                "accepted_count": accepted,
             },
             errors=state.get("errors", []),
         )

@@ -9,7 +9,10 @@ from schemas import CaseDocument, Finding
 from utils import stable_id
 
 from .prompt import FACT_PROMPT
-from .schema import FactOut
+from .schema import FactItem, FactOut
+
+# A grounded finding must name a source document AND a quote.
+_GROUNDED_TYPES = {"fact_contradiction", "claim_supported"}
 
 
 def check_consistency(motion: CaseDocument, supporting: list[CaseDocument]) -> list[Finding]:
@@ -32,17 +35,36 @@ def check_consistency(motion: CaseDocument, supporting: list[CaseDocument]) -> l
         tool_description="Emit cross-document fact-consistency findings.",
     )
 
-    return [
-        Finding(
-            finding_id=stable_id("fnd", "fact", item.statement, item.finding_type),
-            finding_type=item.finding_type,
-            category="fact",
-            severity=item.severity,
-            statement=item.statement,
-            assessment=item.assessment,
-            source_document=item.source_document,
-            evidence_quote=item.evidence_quote,
-            confidence=0.6,
-        )
-        for item in out.items
-    ]
+    return [_to_finding(item) for item in out.items]
+
+
+def _to_finding(item: FactItem) -> Finding:
+    finding_type = item.finding_type
+    assessment = item.assessment
+    source = item.source_document
+    quote = item.evidence_quote
+
+    # Defensive downgrade: a grounded decision without source+quote is not
+    # actually grounded. Demote to could_not_verify so it cannot be flagged
+    # as a rejection / hallucination.
+    if finding_type in _GROUNDED_TYPES and (not source or not quote):
+        finding_type = "could_not_verify"
+        source = None
+        quote = None
+        assessment = (
+            f"{assessment} (downgraded: agent returned {item.finding_type} without"
+            " a verbatim source quote.)"
+        ).strip()
+
+    return Finding(
+        finding_id=stable_id("fnd", "fact", item.statement, finding_type),
+        finding_type=finding_type,
+        category="fact",
+        severity=item.severity,
+        statement=item.statement,
+        assessment=assessment,
+        source_document=source,
+        evidence_quote=quote,
+        confidence=0.6,
+    )
+

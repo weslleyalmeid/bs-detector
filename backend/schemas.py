@@ -20,6 +20,7 @@ InternalFindingType = Literal[
     "unsupported_citation",
     "inaccurate_quote",
     "fact_contradiction",
+    "claim_supported",
     "could_not_verify",
 ]
 

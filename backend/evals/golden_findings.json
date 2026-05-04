@@ -1,36 +1,67 @@
 {
+  "case_id": "rivera_v_harmon",
   "case_name": "Rivera v. Harmon Construction Group, Inc.",
-  "notes": "Time-boxed golden set. Each expected check describes a known issue. Matching: same category + decision AND any keyword in the check's statement or reason.",
+  "source": "ai_generated_synthetic_fixture",
+  "purpose": "Demonstrate eval harness behavior against known expected issues in the provided motion and supporting documents.",
+  "limitations": [
+    "This is not exhaustive legal ground truth.",
+    "In production, expected findings should be created or reviewed by legal experts.",
+    "This fixture is used to demonstrate precision, recall, and hallucination-rate measurement."
+  ],
   "expected_checks": [
     {
-      "id": "incident_date",
+      "id": "E001_incident_date",
       "category": "fact",
-      "decision": "rejected",
-      "keywords": ["march 14", "march 12", "date of incident", "date of the incident"]
+      "expected_decision": "rejected",
+      "expected_source_document": "police_report.txt",
+      "statement_keywords": ["incident", "march 14", "2021", "date"],
+      "evidence_keywords": ["march 12", "2021"],
+      "description": "Motion states the incident occurred on March 14, but the police report states March 12."
     },
     {
-      "id": "ppe_worn",
+      "id": "E002_ppe_worn",
       "category": "fact",
-      "decision": "rejected",
-      "keywords": ["personal protective equipment", "ppe", "harness", "fall-arrest", "fall arrest"]
+      "expected_decision": "rejected",
+      "expected_source_document": null,
+      "statement_keywords": ["ppe", "harness", "fall-arrest", "fall arrest", "personal protective equipment"],
+      "evidence_keywords": ["wearing", "harness", "ppe"],
+      "description": "Motion claims Rivera was not wearing required PPE/harness; police report and witness statement indicate he was."
     },
     {
-      "id": "control_of_work",
+      "id": "E003_control_of_work",
       "category": "fact",
-      "decision": "rejected",
-      "keywords": ["donner", "directed", "control", "foreman"]
+      "expected_decision": "rejected",
+      "expected_source_document": "witness_statement.txt",
+      "statement_keywords": ["control", "directed", "foreman", "donner"],
+      "evidence_keywords": ["donner", "directed", "foreman"],
+      "description": "Motion claims Harmon did not direct the work; witness statement names a Harmon foreman directing tasks."
     },
     {
-      "id": "osha_inspection",
+      "id": "E004_osha_inspection",
       "category": "fact",
-      "decision": "unable_to_determine",
-      "keywords": ["osha", "inspection", "february 26"]
+      "expected_decision": "unable_to_determine",
+      "expected_source_document": null,
+      "statement_keywords": ["osha", "inspection", "iipp", "compliance"],
+      "evidence_keywords": [],
+      "description": "Motion asserts OSHA/IIPP inspection facts not addressable from the provided documents."
     },
     {
-      "id": "privette_quote",
+      "id": "E005_privette_quote",
       "category": "citation",
-      "decision": "unable_to_determine",
-      "keywords": ["privette", "never liable", "hirer"]
+      "expected_decision": "unable_to_determine",
+      "expected_source_document": null,
+      "statement_keywords": ["privette", "hirer", "never liable"],
+      "evidence_keywords": [],
+      "description": "Privette v. Superior Court is cited but the authority text is not in the case file; cannot be verified."
+    },
+    {
+      "id": "E006_employment_relationship",
+      "category": "fact",
+      "expected_decision": "accepted",
+      "expected_source_document": null,
+      "statement_keywords": ["rivera", "employee", "westside", "subcontractor"],
+      "evidence_keywords": ["westside", "employee", "employed"],
+      "description": "Motion's claim that Rivera was an employee of the subcontractor (Westside Steel) is supported by the supporting documents."
     }
   ]
 }
