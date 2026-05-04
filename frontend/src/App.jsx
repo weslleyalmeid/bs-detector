@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import DecisionBadge from './components/DecisionBadge.jsx'
 import CitationReview from './components/CitationReview.jsx'
@@ -11,6 +11,21 @@ function App() {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  // The verdict pill in the sidebar only appears once the full hero has
+  // scrolled out of view — otherwise the verdict would be shown twice.
+  const [heroVisible, setHeroVisible] = useState(true)
+  const heroRef = useRef(null)
+
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeroVisible(entry.isIntersecting),
+      { threshold: 0 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [report])
 
   const runAnalysis = async () => {
     setLoading(true)
@@ -58,7 +73,7 @@ function App() {
         {report && (
           <>
             {/* Verdict at a glance — full width */}
-            <section className="hero">
+            <section className="hero" ref={heroRef}>
               <DecisionBadge decision={report.overall_decision} size="lg" />
               {report.summary && <p className="hero-summary">{report.summary}</p>}
             </section>
@@ -83,10 +98,12 @@ function App() {
               </div>
 
               <aside className="report-col report-col--summary">
-                <div className="verdict-pill">
-                  <span className="verdict-pill-label">Verdict</span>
-                  <DecisionBadge decision={report.overall_decision} size="sm" />
-                </div>
+                {!heroVisible && (
+                  <div className="verdict-pill">
+                    <span className="verdict-pill-label">Verdict</span>
+                    <DecisionBadge decision={report.overall_decision} size="sm" />
+                  </div>
+                )}
                 <JudicialMemo memo={report.judicial_memo} />
                 <MetricsGrid metrics={report.metrics} />
               </aside>
