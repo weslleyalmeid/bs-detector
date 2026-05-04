@@ -4,8 +4,8 @@ from typing import Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from agents import check_consistency, verify_citations, write_memo
-from utils import quote_grounded_in, stable_id, to_case_documents
+from agents import check_consistency, score_findings, verify_citations, write_memo
+from utils import stable_id, to_case_documents
 from schemas import (
     CaseDocument,
     CitationCandidate,
@@ -17,7 +17,6 @@ from schemas import (
 )
 
 CASE_NAME = "Rivera v. Harmon Construction Group, Inc."
-GROUNDING_REQUIRED = {"fact_contradiction", "inaccurate_quote", "claim_supported"}
 
 _DECISION_BY_TYPE: dict[str, Decision] = {
     "could_not_verify": "unable_to_determine",
@@ -45,30 +44,6 @@ def _safe(name, fn):
         except Exception as e:  # noqa: BLE001
             return {"errors": list(state.get("errors", [])) + [f"[{name}] {type(e).__name__}: {e}"]}
     return wrapped
-
-
-def _normalize_confidence(findings: list[Finding], documents: list[CaseDocument]) -> list[Finding]:
-    out = []
-    for f in findings:
-        conf, reason = f.confidence, f.confidence_reason
-        if f.finding_type == "could_not_verify":
-            conf = min(conf, 0.5)
-            if not reason:
-                reason = (
-                    "Evidence available but insufficient to confirm or refute the claim."
-                    if (f.source_document and f.evidence_quote)
-                    else "Required evidence was not available in the case file."
-                )
-        elif f.finding_type in GROUNDING_REQUIRED:
-            grounded = quote_grounded_in(f.evidence_quote or "", documents)
-            if grounded:
-                conf = max(conf, 0.8)
-                reason = (reason + " Evidence quote located verbatim in source document.").strip()
-            else:
-                conf = min(conf, 0.4)
-                reason = (reason + " Lowered: evidence quote not found verbatim.").strip()
-        out.append(f.model_copy(update={"confidence": round(conf, 2), "confidence_reason": reason}))
-    return out
 
 
 def _aggregate_decision(decisions: list[Decision]) -> Decision:
@@ -157,15 +132,22 @@ def node_consistency(state: State) -> dict:
 
 
 def node_report(state: State) -> dict:
-    findings = _normalize_confidence(state.get("findings", []), state.get("documents", []))
+    findings = score_findings(state.get("findings", []), state.get("documents", []))
     citations = state.get("citations", [])
+    errors = list(state.get("errors", []))
 
     citation_review = _build_citation_review(citations)
     # checks[] holds factual checks only; citation/quote results live in citation_review.
     fact_findings = [f for f in findings if f.category == "fact"]
     checks = [_to_check(f) for f in fact_findings]
     overall = _aggregate_decision([c.decision for c in checks] + [citation_review.decision])
-    memo = write_memo(findings)
+
+    # Memo failure must NOT prevent the report from being produced.
+    try:
+        memo = write_memo(findings)
+    except Exception as e:  # noqa: BLE001
+        memo = None
+        errors.append(f"[judicial_memo] {type(e).__name__}: {e}")
 
     rejected = sum(1 for c in checks if c.decision == "rejected")
     accepted = sum(1 for c in checks if c.decision == "accepted")
@@ -191,7 +173,7 @@ def node_report(state: State) -> dict:
                 "unable_to_determine_count": unable,
                 "accepted_count": accepted,
             },
-            errors=state.get("errors", []),
+            errors=errors,
         )
     }
 
