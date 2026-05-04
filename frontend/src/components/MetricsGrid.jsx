@@ -1,4 +1,14 @@
+// Short labels to keep tiles single-line and aligned in the sidebar.
+const LABELS = {
+  total_citations: 'Citations',
+  total_checks: 'Checks',
+  rejected_count: 'Rejected',
+  accepted_count: 'Accepted',
+  unable_to_determine_count: 'Unable',
+}
+
 function formatLabel(key) {
+  if (LABELS[key]) return LABELS[key]
   return key
     .split('_')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
