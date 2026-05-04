@@ -1,100 +1,209 @@
 # BS Detector
 
-Legal briefs lie. Not always intentionally — but they do. They cite cases that don't say what they claim. They quote authority with words quietly removed. They state facts that contradict the documents sitting right next to them.
+Multi-agent legal verification pipeline that audits a Motion for Summary
+Judgment against its supporting record (police report, medical records,
+witness statement) and the legal authorities it cites.
 
-Your task: build an AI pipeline that catches it.
+> The challenge brief lives in [CHALLENGE.md](CHALLENGE.md).
+> Design notes and tradeoffs live in [REFLECTION.md](REFLECTION.md).
 
-## Setup
-
-### Docker (recommended)
-
-```bash
-cp .env.example .env      # Add your OpenAI API key
-docker compose up --build
-```
-
-The API runs at `http://localhost:8002`. The UI runs at `http://localhost:5175`.
-
-Both services hot-reload — edit files on your host and changes appear automatically.
-
-### Manual Setup
-
-#### Backend
+## Quick start
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env      # Add your OpenAI API key
-uvicorn main:app --reload
+make setup        # uv venv + deps + .env + npm install
+echo OPENAI_API_KEY=sk-... >> backend/.env
+make dev          # backend on :8002, frontend on :5175
 ```
 
-The API runs at `http://localhost:8002`.
+Open `http://localhost:5175`, click **Run analysis**.
 
-#### Frontend
+## Architecture
+
+A LangGraph `StateGraph` orchestrates four named agents over a typed state.
+
+```mermaid
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([__start__]):::first
+	citations(CitationVerifier)
+	consistency(FactConsistency)
+	report(ConfidenceScoring + JudicialMemo + Report assembly)
+	__end__([__end__]):::last
+	__start__ --> citations;
+	citations --> consistency;
+	consistency --> report;
+	report --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+```
+
+Regenerate the raw mermaid output any time with:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+make graph
 ```
 
-The UI runs at `http://localhost:5175`.
+### Agents
 
-## The Task
+Each agent lives in its own subpackage under `backend/agents/`, with an
+explicit `prompt.py`, `schema.py` (when LLM-backed), and `agent.py`:
 
-Inside `backend/documents/` you'll find a small case file: a Motion for Summary Judgment in a personal injury lawsuit (*Rivera v. Harmon Construction Group*), along with a police report, medical records, and a witness statement.
+| Agent | Type | Responsibility |
+|---|---|---|
+| `CitationVerifier` | LLM (tool-call) | Extracts every citation, proposition, and direct quote. Sets `support_decision` and `quote_decision` per citation. |
+| `FactConsistency` | LLM (tool-call) + 3 deterministic safeguards | Compares motion claims to supporting docs. Emits one `Finding` per claim. Safeguards: missing-quote downgrade, salient-token grounding gate (blocks both false `accepted` and false `rejected`), salient-token dedupe. |
+| `ConfidenceScoring` | Deterministic | Normalizes confidence and produces a coherent `confidence_reason`. `could_not_verify` capped at 0.5; grounded contradictions/supports floored at 0.8; ungrounded ones capped at 0.4. |
+| `JudicialMemo` | LLM (free text) | Writes a short paragraph for a judge from the ranked findings. Wrapped in try/except in the report node so its failure never takes the report down. |
 
-Build a multi-agent pipeline that analyzes these documents and produces a structured verification report. Your pipeline should:
+### Decisions, not severity
 
-**Core (Tier 1)**
-- Extract all citations from the Motion for Summary Judgment
-- For each citation, assess whether the cited authority actually supports the proposition as stated
-- Flag direct quotes for accuracy
-- Produce structured output (JSON) — not a wall of prose
+The public report uses a 3-state decision model end to end:
 
-**Expected (Tier 2)**
-- Build an eval harness that measures your pipeline's output quality. It must be runnable via a single command (e.g., `python run_evals.py`). At minimum, measure precision (avoiding false flags), recall (catching known flaws), and hallucination rate (not fabricating findings). You choose the approach — there's no prescribed framework or tooling.
-- Cross-document consistency check: compare facts stated in the MSJ against the police report, medical records, and witness statement
-- Express uncertainty appropriately — "could not verify" rather than fabricating a finding
-- Pass structured data between agents, not raw text blobs
+- `accepted` — the record supports the claim.
+- `rejected` — the record contradicts the claim, with a verbatim
+  evidence quote located in the named source document.
+- `unable_to_determine` — the cited authority is missing, the supporting
+  record is silent, or evidence is ambiguous. This is the explicit way the
+  pipeline says "I don't know" instead of fabricating a finding.
 
-**Stretch (Tier 3)**
-- At least 4 well-defined agents with distinct, non-overlapping roles
-- A confidence scoring layer: each flag rated by how certain the pipeline is, with reasoning
-- A judicial memo agent: synthesizes the top findings into a one-paragraph summary written for a judge
-- Agent orchestration that handles failures gracefully
-- A UI that displays the report in a structured, readable way — not just raw JSON
-- A reflection document explaining the tradeoffs you made and what you'd do differently
+Citation verification results live in `report.citation_review.citations[]`,
+not in `report.checks[]`, so missing legal authorities never produce noisy
+"could_not_verify" check rows.
 
-## Deliverables
+## API
 
-1. A working `POST /analyze` endpoint that returns a structured verification report
-2. Agent code with clear, named agents and explicit prompts
-3. A runnable eval suite with instructions in your README on how to run it
-4. A brief reflection (in the repo or as a separate file) on your design decisions and tradeoffs
+```
+POST /analyze
+```
 
-## Time
+Loads the documents in `backend/documents/`, runs the pipeline, and returns:
 
-6 hours. This is intentionally scoped beyond what most candidates will finish. Where you invest your time matters more than finishing everything. A well-tested pipeline that catches 3 flaws is stronger than an untested one that attempts 10.
+```json
+{
+  "report": {
+    "case_name": "Rivera v. Harmon Construction Group, Inc.",
+    "overall_decision": "rejected",
+    "summary": "Overall: rejected. 8 factual check(s) — 3 rejected, ...",
+    "citation_review": {
+      "decision": "unable_to_determine",
+      "total_citations": 12,
+      "reason": "...",
+      "citations": [
+        {
+          "citation_id": "...",
+          "raw_citation": "Privette v. Superior Court, 5 Cal.4th 689, 702 (1993)",
+          "proposition": "A hirer is never liable...",
+          "direct_quote": "A hirer is never liable...",
+          "support_decision": "unable_to_determine",
+          "support_reason": "The cited authority text was not available...",
+          "quote_decision": "unable_to_determine",
+          "quote_reason": "The quoted authority text was not available..."
+        }
+      ]
+    },
+    "checks": [
+      {
+        "check_id": "...",
+        "category": "fact",
+        "statement": "Rivera was not wearing required PPE...",
+        "decision": "rejected",
+        "reason": "Police report and witness statement indicate Rivera was wearing a harness...",
+        "source_document": "police_report.txt",
+        "evidence_quote": "Site supervisor Mark Ellison confirmed...",
+        "confidence": 0.8,
+        "confidence_reason": "Evidence quote located verbatim in source document."
+      }
+    ],
+    "judicial_memo": "The motion is undermined by ...",
+    "metrics": { "total_citations": 12, "total_checks": 8, ... },
+    "errors": []
+  }
+}
+```
 
-## Evals
+## Eval harness
 
-We run your eval suite as part of our review. Document how to run it in your README. We care more about thoughtful metric design than perfect scores — an eval that honestly reports 60% recall tells us more than one that reports 100% on cherry-picked cases.
+```bash
+make eval
+# or:
+cd backend && ./.venv/bin/python evals/run_evals.py
+```
 
-## AI Usage
+Runs the live pipeline once, scores the result against
+`backend/evals/golden_findings.json`, prints a readable report, and saves:
 
-Use everything. That's the job. We want to see how you use it, not whether you do.
+- `backend/evals/baseline_results.json` — last run.
+- `backend/evals/runs/<timestamp>.json` — append-only history.
 
-## Evaluation
+### Metrics
 
-We are evaluating:
+| Metric | Definition |
+|---|---|
+| `schema_validity` | 1.0 if `VerificationReport` validates, else 0.0 |
+| `precision` | `correct_rejected / generated_rejected`. Only `rejected` checks are scored. |
+| `recall` | `matched_expected_rejected / expected_rejected`. Only `rejected` expectations are scored. |
+| `hallucination_rate` | Of `rejected` checks, fraction missing `source_document`, missing `evidence_quote`, or with a quote not found verbatim in any source. `unable_to_determine` is **not** counted. |
+| `unable_to_determine_rate` | `unable_to_determine_checks / total_checks` |
+| `coverage` | `(accepted + rejected) / total_checks` — share of decided (non-uncertain) checks |
 
-1. How you decompose the problem into agents
-2. How precisely you write prompts
-3. The quality of your eval approach — do you measure what matters?
-4. How far you get through the spec
-5. How honest your reflection is
+### Current baseline
 
-Not lines of code.
+`make eval` against the Rivera case file:
+
+```
+schema_validity = 1.00
+precision       = 0.67
+recall          = 0.67
+hallucination_rate       = 0.00
+unable_to_determine_rate = 0.62
+coverage                 = 0.38
+```
+
+The golden fixture (`backend/evals/golden_findings.json`) is small and
+synthetic — see its `limitations` field. It is meant to demonstrate the
+harness, not to act as production legal ground truth.
+
+## Project layout
+
+```
+backend/
+├── main.py                    # FastAPI app + load_documents()
+├── pipeline.py                # LangGraph StateGraph + report assembly
+├── schemas.py                 # Pydantic models (public + internal)
+├── llm.py                     # call_llm + call_with_tool (forced tool calling)
+├── utils.py                   # to_case_documents, stable_id, normalize, quote_grounded_in
+├── print_graph.py             # `make graph` — mermaid dump
+├── agents/
+│   ├── citation_verifier/     # prompt.py + schema.py + agent.py
+│   ├── fact_consistency/      # prompt.py + schema.py + agent.py
+│   ├── confidence_scorer/     # agent.py (deterministic)
+│   └── judicial_memo/         # prompt.py + agent.py
+├── documents/                 # the case file
+└── evals/
+    ├── run_evals.py
+    ├── golden_findings.json
+    ├── baseline_results.json
+    └── runs/
+
+frontend/
+└── src/
+    ├── App.jsx + App.css
+    └── components/            # DecisionBadge, CitationReview, CheckCard,
+                               # JudicialMemo, MetricsGrid, ErrorList
+```
+
+## Make targets
+
+| Target | Purpose |
+|---|---|
+| `make setup` | uv venv, install deps, copy `.env.example`, `npm install` |
+| `make dev` | Run backend + frontend in parallel |
+| `make dev-backend` | Backend only (`uvicorn` on :8002) |
+| `make dev-frontend` | Frontend only (`vite` on :5175) |
+| `make eval` | Run the eval harness, persist results |
+| `make graph` | Print the LangGraph as Mermaid |

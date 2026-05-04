@@ -1,4 +1,4 @@
-.PHONY: setup install dev dev-backend dev-frontend eval analyze
+.PHONY: setup install dev dev-backend dev-frontend eval analyze graph
 
 setup:
 	uv venv backend/.venv
@@ -20,3 +20,6 @@ dev-frontend:
 
 eval:
 	cd backend && ./.venv/bin/python evals/run_evals.py
+
+graph:
+	cd backend && ./.venv/bin/python print_graph.py
