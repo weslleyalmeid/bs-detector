@@ -21,3 +21,6 @@ dist/
 
 # Plans
 docs/plans/
+
+# Eval artifacts
+backend/evals/runs/
