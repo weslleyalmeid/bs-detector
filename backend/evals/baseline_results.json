@@ -1,5 +1,5 @@
 {
-  "timestamp": "20260504T010823Z",
+  "timestamp": "20260504T012440Z",
   "case_id": "rivera_v_harmon",
   "overall_decision": "rejected",
   "metrics": {
@@ -7,8 +7,8 @@
     "precision": 1.0,
     "recall": 0.667,
     "hallucination_rate": 0.0,
-    "unable_to_determine_rate": 0.6,
-    "coverage": 0.4,
+    "unable_to_determine_rate": 0.7,
+    "coverage": 0.3,
     "counts": {
       "expected_total": 6,
       "expected_rejected": 3,
@@ -17,8 +17,8 @@
       "generated_rejected": 2,
       "correct_rejected": 2,
       "ungrounded_rejected": 0,
-      "accepted_checks": 2,
-      "unable_to_determine_checks": 6,
+      "accepted_checks": 1,
+      "unable_to_determine_checks": 7,
       "total_checks": 10,
       "total_citations": 12
     },

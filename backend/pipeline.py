@@ -53,7 +53,12 @@ def _normalize_confidence(findings: list[Finding], documents: list[CaseDocument]
         conf, reason = f.confidence, f.confidence_reason
         if f.finding_type == "could_not_verify":
             conf = min(conf, 0.5)
-            reason = reason or "Source authority/text not in case file."
+            if not reason:
+                reason = (
+                    "Evidence available but insufficient to confirm or refute the claim."
+                    if (f.source_document and f.evidence_quote)
+                    else "Required evidence was not available in the case file."
+                )
         elif f.finding_type in GROUNDING_REQUIRED:
             grounded = quote_grounded_in(f.evidence_quote or "", documents)
             if grounded:
