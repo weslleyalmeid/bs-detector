@@ -83,6 +83,10 @@ function App() {
               </div>
 
               <aside className="report-col report-col--summary">
+                <div className="verdict-pill">
+                  <span className="verdict-pill-label">Verdict</span>
+                  <DecisionBadge decision={report.overall_decision} size="sm" />
+                </div>
                 <JudicialMemo memo={report.judicial_memo} />
                 <MetricsGrid metrics={report.metrics} />
               </aside>
