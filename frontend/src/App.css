@@ -132,6 +132,13 @@ body {
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-alt) 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  /* Anchor the verdict to the top of the viewport while scrolling
+     so the user never loses sight of the overall decision. */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  /* Subtle shadow appears once it sticks to add separation from content */
+  box-shadow: 0 1px 0 var(--border), 0 4px 12px rgba(20, 20, 20, 0.04);
 }
 .hero .hero-summary {
   margin: 0;
@@ -152,10 +159,10 @@ body {
 .report-col { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
 .report-col--summary {
   position: sticky;
-  /* 1.5rem of breathing room from viewport top while scrolling */
-  top: 1.5rem;
+  /* Sits below the sticky hero (≈68px tall) plus a bit of breathing room */
+  top: 5rem;
   /* Constrain so a long memo can scroll inside its own column */
-  max-height: calc(100vh - 3rem);
+  max-height: calc(100vh - 6rem);
   overflow-y: auto;
 }
 
