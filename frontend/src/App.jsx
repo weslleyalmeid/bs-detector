@@ -57,28 +57,37 @@ function App() {
 
         {report && (
           <>
-            <section className="section">
-              <div className="hero-card">
-                <DecisionBadge decision={report.overall_decision} size="lg" />
-                {report.summary && <p className="hero-summary">{report.summary}</p>}
-              </div>
+            {/* Verdict at a glance — full width */}
+            <section className="hero">
+              <DecisionBadge decision={report.overall_decision} size="lg" />
+              {report.summary && <p className="hero-summary">{report.summary}</p>}
             </section>
 
-            <CitationReview review={report.citation_review} />
+            {/* Two-column investigative layout:
+                left = exploration (citations + checks, scrollable)
+                right = synthesis (memo + metrics, sticky) */}
+            <div className="report-grid">
+              <div className="report-col report-col--explore">
+                <CitationReview review={report.citation_review} />
 
-            {checks.length > 0 && (
-              <section className="section">
-                <h2 className="section-title">Factual Checks ({checks.length})</h2>
-                <div className="checks-list">
-                  {checks.map((c) => (
-                    <CheckCard key={c.check_id} check={c} />
-                  ))}
-                </div>
-              </section>
-            )}
+                {checks.length > 0 && (
+                  <section className="section">
+                    <h2 className="section-title">Factual Checks ({checks.length})</h2>
+                    <div className="checks-list">
+                      {checks.map((c) => (
+                        <CheckCard key={c.check_id} check={c} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
 
-            <JudicialMemo memo={report.judicial_memo} />
-            <MetricsGrid metrics={report.metrics} />
+              <aside className="report-col report-col--summary">
+                <JudicialMemo memo={report.judicial_memo} />
+                <MetricsGrid metrics={report.metrics} />
+              </aside>
+            </div>
+
             <ErrorList errors={report.errors} />
           </>
         )}

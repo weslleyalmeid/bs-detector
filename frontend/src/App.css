@@ -44,7 +44,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.app { max-width: 1080px; margin: 0 auto; padding: 3rem 1.75rem 5rem; }
+.app { max-width: 1280px; margin: 0 auto; padding: 3rem 1.75rem 5rem; }
 
 /* -------- Header -------- */
 .header {
@@ -121,6 +121,42 @@ body {
   font-size: 1rem;
   line-height: 1.55;
   font-weight: 500;
+}
+
+/* -------- Hero (compact full-width verdict bar) -------- */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-alt) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.hero .hero-summary {
+  margin: 0;
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+/* -------- Report grid (50/50 explore + synthesis) -------- */
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.75rem;
+  align-items: start;
+}
+.report-col { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+.report-col--summary {
+  position: sticky;
+  /* 1.5rem of breathing room from viewport top while scrolling */
+  top: 1.5rem;
+  /* Constrain so a long memo can scroll inside its own column */
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
 }
 
 .empty-state {
@@ -235,7 +271,10 @@ body {
 
 /* -------- Metrics -------- */
 .metrics-grid {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.85rem;
+  display: grid;
+  /* Auto-fits 2-3 columns inside the sidebar without overflowing */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
 }
 .metric-tile {
   background: var(--surface); border: 1px solid var(--border);
@@ -262,6 +301,11 @@ body {
 .error-list li { margin: 0.25rem 0; }
 
 /* -------- Responsive -------- */
+@media (max-width: 1000px) {
+  /* Stack columns; drop sticky behavior — it's annoying on narrow screens */
+  .report-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+  .report-col--summary { position: static; max-height: none; overflow: visible; }
+}
 @media (max-width: 860px) {
   .metrics-grid { grid-template-columns: repeat(3, 1fr); }
 }
@@ -272,6 +316,6 @@ body {
   .run-btn { width: 100%; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .card-header { flex-wrap: wrap; }
-  .hero-card { padding: 1.5rem; }
+  .hero { flex-direction: column; align-items: flex-start; padding: 1.25rem; }
   .memo-card { padding: 1.25rem 1.5rem; }
 }
