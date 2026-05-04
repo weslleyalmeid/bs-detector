@@ -1,6 +1,7 @@
 """LangGraph pipeline as a class. Compiled once at import."""
 
-from typing import Optional, TypedDict
+from operator import add
+from typing import Annotated, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -30,11 +31,15 @@ _DECISION_BY_TYPE: dict[str, Decision] = {
 class State(TypedDict, total=False):
     documents: list[CaseDocument]
     motion: Optional[CaseDocument]
-    citations: list[CitationCandidate]
-    findings: list[Finding]
-    judicial_memo: Optional[str]
-    errors: list[str]
-    report: Optional[VerificationReport]
+    # `errors` uses an additive reducer so any node (including parallel
+    # branches) can append without clobbering prior errors.
+    errors: Annotated[list[str], add]
+    # Single-writer slots — no reducer needed.
+    citations: list[CitationCandidate]      # written by node_citations
+    findings: list[Finding]                  # written by node_consistency
+    scored_findings: list[Finding]           # written by node_score
+    judicial_memo: Optional[str]             # written by node_memo
+    report: Optional[VerificationReport]     # written by node_assemble
 
 
 def _safe(name, fn):
@@ -42,7 +47,7 @@ def _safe(name, fn):
         try:
             return fn(state)
         except Exception as e:  # noqa: BLE001
-            return {"errors": list(state.get("errors", [])) + [f"[{name}] {type(e).__name__}: {e}"]}
+            return {"errors": [f"[{name}] {type(e).__name__}: {e}"]}
     return wrapped
 
 
@@ -87,7 +92,6 @@ def _build_citation_review(citations: list[CitationCandidate]) -> CitationReview
     overall = _aggregate_decision(decisions)
 
     rejected = sum(1 for c in citations if c.support_decision == "rejected")
-    unable = sum(1 for c in citations if c.support_decision == "unable_to_determine")
 
     if overall == "rejected":
         reason = (
@@ -111,15 +115,23 @@ def _build_citation_review(citations: list[CitationCandidate]) -> CitationReview
 
 
 # --------------------------- Nodes ---------------------------
+# Topology:
+#
+#   START ─┬─→ citations ──┐
+#          │               ├─→ score → memo → assemble → END
+#          └─→ consistency ┘
+#
+# citations + consistency are independent (different inputs, no shared state),
+# so they fan out from START in parallel. score/memo/assemble are sequential
+# because each consumes the previous one's output.
 
 
 def node_citations(state: State) -> dict:
     motion = state.get("motion")
     if not motion:
-        return {"citations": []}
+        return {}
     authorities = [d for d in state["documents"] if d.document_type == "legal_authority"]
-    citations = verify_citations(motion, authorities)
-    return {"citations": citations}
+    return {"citations": verify_citations(motion, authorities)}
 
 
 def node_consistency(state: State) -> dict:
@@ -127,27 +139,35 @@ def node_consistency(state: State) -> dict:
     if not motion:
         return {}
     supporting = [d for d in state["documents"] if d.document_type not in {"motion", "legal_authority"}]
-    new = check_consistency(motion, supporting)
-    return {"findings": list(state.get("findings", [])) + new}
+    return {"findings": check_consistency(motion, supporting)}
 
 
-def node_report(state: State) -> dict:
-    findings = score_findings(state.get("findings", []), state.get("documents", []))
+def node_score(state: State) -> dict:
+    """Apply deterministic confidence scoring to raw findings."""
+    scored = score_findings(state.get("findings", []), state.get("documents", []))
+    return {"scored_findings": scored}
+
+
+def node_memo(state: State) -> dict:
+    findings = state.get("scored_findings", [])
+    try:
+        return {"judicial_memo": write_memo(findings)}
+    except Exception as e:  # noqa: BLE001
+        return {
+            "judicial_memo": None,
+            "errors": [f"[judicial_memo] {type(e).__name__}: {e}"],
+        }
+
+
+def node_assemble(state: State) -> dict:
+    findings = state.get("scored_findings", [])
     citations = state.get("citations", [])
     errors = list(state.get("errors", []))
 
     citation_review = _build_citation_review(citations)
-    # checks[] holds factual checks only; citation/quote results live in citation_review.
     fact_findings = [f for f in findings if f.category == "fact"]
     checks = [_to_check(f) for f in fact_findings]
     overall = _aggregate_decision([c.decision for c in checks] + [citation_review.decision])
-
-    # Memo failure must NOT prevent the report from being produced.
-    try:
-        memo = write_memo(findings)
-    except Exception as e:  # noqa: BLE001
-        memo = None
-        errors.append(f"[judicial_memo] {type(e).__name__}: {e}")
 
     rejected = sum(1 for c in checks if c.decision == "rejected")
     accepted = sum(1 for c in checks if c.decision == "accepted")
@@ -165,7 +185,7 @@ def node_report(state: State) -> dict:
             summary=summary,
             citation_review=citation_review,
             checks=checks,
-            judicial_memo=memo,
+            judicial_memo=state.get("judicial_memo"),
             metrics={
                 "total_citations": len(citations),
                 "total_checks": len(checks),
@@ -184,25 +204,35 @@ def node_report(state: State) -> dict:
 class LegalVerificationAgents:
     """Multi-agent legal verification system.
 
-    Orchestrates the citation verifier and fact consistency agents over a case
-    file, then assembles a structured VerificationReport.
+    Orchestrates citation verification and fact consistency in parallel, then
+    runs deterministic confidence scoring, the judicial memo agent, and final
+    report assembly in sequence.
     """
 
     def __init__(self) -> None:
         g: StateGraph = StateGraph(State)
         g.add_node("citations", _safe("citations", node_citations))
         g.add_node("consistency", _safe("consistency", node_consistency))
-        g.add_node("report", _safe("report", node_report))
+        g.add_node("score", _safe("score", node_score))
+        g.add_node("memo", _safe("memo", node_memo))
+        g.add_node("assemble", _safe("assemble", node_assemble))
+
+        # Fan-out: citations + consistency run concurrently.
         g.add_edge(START, "citations")
-        g.add_edge("citations", "consistency")
-        g.add_edge("consistency", "report")
-        g.add_edge("report", END)
+        g.add_edge(START, "consistency")
+        # Join: score waits for both before running.
+        g.add_edge("citations", "score")
+        g.add_edge("consistency", "score")
+        # Sequential tail.
+        g.add_edge("score", "memo")
+        g.add_edge("memo", "assemble")
+        g.add_edge("assemble", END)
         self._graph = g.compile()
 
     def invoke(self, raw_documents: dict[str, str]) -> VerificationReport:
         documents = to_case_documents(raw_documents)
         motion = next((d for d in documents if d.document_type == "motion"), None)
-        final = self._graph.invoke({"documents": documents, "motion": motion, "errors": []})
+        final = self._graph.invoke({"documents": documents, "motion": motion})
         report = final.get("report")
         if report:
             return report
