@@ -1,4 +1,6 @@
-.PHONY: setup install dev dev-backend dev-frontend eval analyze graph
+.PHONY: setup install dev dev-backend dev-frontend eval analyze graph up down logs build
+
+# ---------- Local (uv + npm) ----------
 
 setup:
 	uv venv backend/.venv
@@ -23,3 +25,18 @@ eval:
 
 graph:
 	cd backend && ./.venv/bin/python print_graph.py
+
+# ---------- Docker (clone & run) ----------
+
+up:
+	@if [ ! -f .env ]; then cp .env.example .env && echo "Created .env from .env.example — set OPENAI_API_KEY before continuing."; fi
+	docker compose up --build
+
+down:
+	docker compose down
+
+logs:
+	docker compose logs -f
+
+build:
+	docker compose build

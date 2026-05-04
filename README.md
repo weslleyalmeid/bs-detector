@@ -9,6 +9,23 @@ witness statement) and the legal authorities it cites.
 
 ## Quick start
 
+### With Docker (recommended)
+
+Only requires Docker. Backend and frontend run in containers with hot reload.
+
+```bash
+cp .env.example .env       # then set OPENAI_API_KEY=sk-...
+make up                    # docker compose up --build
+```
+
+Open `http://localhost:5175`, click **Run analysis**.
+
+Other Docker targets: `make down`, `make logs`, `make build`.
+
+### Without Docker
+
+Requires `uv`, Python 3.11+, and Node 20+.
+
 ```bash
 make setup        # uv venv + deps + .env + npm install
 echo OPENAI_API_KEY=sk-... >> backend/.env
