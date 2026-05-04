@@ -1,10 +1,6 @@
-"""Pydantic schemas. Public report uses a decision-based shape."""
-
 from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
-
-# ---- shared ----
 
 DocType = Literal[
     "motion", "police_report", "medical_records", "witness_statement", "legal_authority", "other"
@@ -13,8 +9,6 @@ DocType = Literal[
 Decision = Literal["accepted", "rejected", "unable_to_determine"]
 CheckCategory = Literal["citation", "quote", "fact"]
 Severity = Literal["low", "medium", "high"]
-
-# ---- internal artifacts (not exposed by VerificationReport) ----
 
 InternalFindingType = Literal[
     "unsupported_citation",
@@ -44,8 +38,6 @@ class CitationCandidate(BaseModel):
 
 
 class Finding(BaseModel):
-    """Internal finding used between agents and the report node."""
-
     finding_id: str
     finding_type: InternalFindingType
     category: CheckCategory
@@ -56,9 +48,6 @@ class Finding(BaseModel):
     evidence_quote: Optional[str] = None
     confidence: float = Field(0.5, ge=0.0, le=1.0)
     confidence_reason: str = ""
-
-
-# ---- public report shape ----
 
 
 class VerificationCheck(BaseModel):

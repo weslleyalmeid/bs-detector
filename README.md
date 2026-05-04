@@ -9,6 +9,23 @@ witness statement) and the legal authorities it cites.
 
 ## Quick start
 
+### With Docker (recommended)
+
+Only requires Docker. Backend and frontend run in containers with hot reload.
+
+```bash
+cp .env.example .env       # then set OPENAI_API_KEY=sk-...
+make up                    # docker compose up --build
+```
+
+Open `http://localhost:5175`, click **Run analysis**.
+
+Other Docker targets: `make down`, `make logs`, `make build`.
+
+### Without Docker
+
+Requires `uv`, Python 3.11+, and Node 20+.
+
 ```bash
 make setup        # uv venv + deps + .env + npm install
 echo OPENAI_API_KEY=sk-... >> backend/.env
@@ -20,6 +37,10 @@ Open `http://localhost:5175`, click **Run analysis**.
 ## Architecture
 
 A LangGraph `StateGraph` orchestrates four named agents over a typed state.
+`CitationVerifier` and `FactConsistency` operate on disjoint inputs (legal
+authorities vs supporting documents) and run in parallel via fan-out from
+`START`. `score`, `memo`, and `assemble` form the sequential tail because
+each consumes the previous step's output.
 
 ```mermaid
 ---
@@ -31,12 +52,17 @@ graph TD;
 	__start__([__start__]):::first
 	citations(CitationVerifier)
 	consistency(FactConsistency)
-	report(ConfidenceScoring + JudicialMemo + Report assembly)
+	score(ConfidenceScoring)
+	memo(JudicialMemo)
+	assemble(Report assembly)
 	__end__([__end__]):::last
 	__start__ --> citations;
-	citations --> consistency;
-	consistency --> report;
-	report --> __end__;
+	__start__ --> consistency;
+	citations --> score;
+	consistency --> score;
+	score --> memo;
+	memo --> assemble;
+	assemble --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
@@ -58,7 +84,7 @@ explicit `prompt.py`, `schema.py` (when LLM-backed), and `agent.py`:
 | `CitationVerifier` | LLM (tool-call) | Extracts every citation, proposition, and direct quote. Sets `support_decision` and `quote_decision` per citation. |
 | `FactConsistency` | LLM (tool-call) + 3 deterministic safeguards | Compares motion claims to supporting docs. Emits one `Finding` per claim. Safeguards: missing-quote downgrade, salient-token grounding gate (blocks both false `accepted` and false `rejected`), salient-token dedupe. |
 | `ConfidenceScoring` | Deterministic | Normalizes confidence and produces a coherent `confidence_reason`. `could_not_verify` capped at 0.5; grounded contradictions/supports floored at 0.8; ungrounded ones capped at 0.4. |
-| `JudicialMemo` | LLM (free text) | Writes a short paragraph for a judge from the ranked findings. Wrapped in try/except in the report node so its failure never takes the report down. |
+| `JudicialMemo` | LLM (free text) | Writes a short paragraph for a judge from the ranked findings. Wrapped in try/except in its node so its failure never takes the report down. |
 
 ### Decisions, not severity
 

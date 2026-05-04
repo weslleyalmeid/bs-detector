@@ -1,19 +1,10 @@
-"""ConfidenceScoringAgent.
-
-Deterministic scoring layer (no LLM). Normalizes confidence values and
-attaches a human-readable confidence_reason to each finding so the public
-report always tells the reader *why* a confidence is what it is.
-
-Rules:
-- could_not_verify is capped at 0.5.
-- fact_contradiction / claim_supported / inaccurate_quote require their
-  evidence_quote to appear verbatim in the named source document. When
-  grounded, confidence is floored at 0.8; when ungrounded, capped at 0.4.
-"""
-
 from schemas import CaseDocument, Finding
 from utils import quote_grounded_in
 
+# Deterministic confidence rules:
+# - could_not_verify is capped at 0.5.
+# - GROUNDING_REQUIRED types: floored at 0.8 when the evidence_quote
+#   appears verbatim in the source document, capped at 0.4 otherwise.
 GROUNDING_REQUIRED = {"fact_contradiction", "inaccurate_quote", "claim_supported"}
 
 

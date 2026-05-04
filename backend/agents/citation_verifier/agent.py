@@ -1,9 +1,3 @@
-"""CitationVerifier agent.
-
-Reads the Motion + any legal-authority documents in the case file and returns
-one CitationCandidate per citation, each with explicit support/quote decisions.
-"""
-
 from typing import Optional
 
 from llm import call_with_tool

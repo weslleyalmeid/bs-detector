@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import DecisionBadge from './components/DecisionBadge.jsx'
+import DecisionBadge, { overallMeaning } from './components/DecisionBadge.jsx'
 import CitationReview from './components/CitationReview.jsx'
 import CheckCard from './components/CheckCard.jsx'
 import JudicialMemo from './components/JudicialMemo.jsx'
@@ -11,6 +11,21 @@ function App() {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  // The verdict pill in the sidebar only appears once the full hero has
+  // scrolled out of view — otherwise the verdict would be shown twice.
+  const [heroVisible, setHeroVisible] = useState(true)
+  const heroRef = useRef(null)
+
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeroVisible(entry.isIntersecting),
+      { threshold: 0 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [report])
 
   const runAnalysis = async () => {
     setLoading(true)
@@ -57,28 +72,49 @@ function App() {
 
         {report && (
           <>
-            <section className="section">
-              <div className="hero-card">
-                <DecisionBadge decision={report.overall_decision} size="lg" />
+            {/* Verdict at a glance — full width */}
+            <section className="hero" ref={heroRef}>
+              <DecisionBadge decision={report.overall_decision} size="lg" />
+              <div className="hero-text">
+                <p className="hero-headline">{overallMeaning(report.overall_decision)}</p>
                 {report.summary && <p className="hero-summary">{report.summary}</p>}
               </div>
             </section>
 
-            <CitationReview review={report.citation_review} />
+            {/* Two-column investigative layout:
+                left = exploration (citations + checks, scrollable)
+                right = synthesis (memo + metrics, sticky) */}
+            <div className="report-grid">
+              <div className="report-col report-col--explore">
+                <CitationReview review={report.citation_review} />
 
-            {checks.length > 0 && (
-              <section className="section">
-                <h2 className="section-title">Factual Checks ({checks.length})</h2>
-                <div className="checks-list">
-                  {checks.map((c) => (
-                    <CheckCard key={c.check_id} check={c} />
-                  ))}
-                </div>
-              </section>
-            )}
+                {checks.length > 0 && (
+                  <section className="section">
+                    <h2 className="section-title">Factual Checks ({checks.length})</h2>
+                    <div className="checks-list">
+                      {checks.map((c) => (
+                        <CheckCard key={c.check_id} check={c} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
 
-            <JudicialMemo memo={report.judicial_memo} />
-            <MetricsGrid metrics={report.metrics} />
+              <aside className="report-col report-col--summary">
+                {!heroVisible && (
+                  <div className="verdict-pill">
+                    <div className="verdict-pill-row">
+                      <span className="verdict-pill-label">Verdict</span>
+                      <DecisionBadge decision={report.overall_decision} size="sm" />
+                    </div>
+                    <p className="verdict-pill-meaning">{overallMeaning(report.overall_decision)}</p>
+                  </div>
+                )}
+                <JudicialMemo memo={report.judicial_memo} />
+                <MetricsGrid metrics={report.metrics} />
+              </aside>
+            </div>
+
             <ErrorList errors={report.errors} />
           </>
         )}

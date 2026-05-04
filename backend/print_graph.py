@@ -1,11 +1,3 @@
-"""Print the compiled LangGraph as a Mermaid diagram.
-
-Usage:
-    python print_graph.py
-or:
-    make graph
-"""
-
 from pipeline import agents
 
 
